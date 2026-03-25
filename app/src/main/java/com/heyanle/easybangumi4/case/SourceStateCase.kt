@@ -1,5 +1,6 @@
 package com.heyanle.easybangumi4.case
 
+import com.heyanle.easybangumi4.plugin.source.ISourceController
 import com.heyanle.easybangumi4.plugin.source.SourceController
 import com.heyanle.easybangumi4.plugin.source.bundle.SourceBundle
 import kotlinx.coroutines.flow.Flow
@@ -11,7 +12,7 @@ import kotlinx.coroutines.flow.first
  * Created by heyanlin on 2023/10/2.
  */
 class SourceStateCase(
-    private val sourceController: SourceController,
+    private val sourceController: ISourceController,
 ) {
 
     // 等到下一个番剧源就绪状态
@@ -23,7 +24,7 @@ class SourceStateCase(
         return sourceController.sourceBundle.filterIsInstance()
     }
 
-    fun flowState(): StateFlow<SourceController.SourceInfoState> {
+    fun flowState(): StateFlow<ISourceController.SourceInfoState> {
         return sourceController.sourceInfo
     }
 

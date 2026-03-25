@@ -31,6 +31,8 @@ import com.heyanle.easybangumi4.ui.about.About
 import com.heyanle.easybangumi4.ui.cartoon_play.CartoonPlay
 import com.heyanle.easybangumi4.ui.cartoon_play.view_model.CartoonPlayViewModel
 import com.heyanle.easybangumi4.ui.dlna.Dlna
+import com.heyanle.easybangumi4.ui.extension_push.ExtensionPush
+import com.heyanle.easybangumi4.ui.extension_push.ExtensionPushV2
 import com.heyanle.easybangumi4.ui.story.download.Download
 import com.heyanle.easybangumi4.ui.main.Main
 import com.heyanle.easybangumi4.ui.main.history.History
@@ -91,6 +93,10 @@ const val TAG_MANAGE = "tag_manage"
 const val STORAGE = "storage"
 
 const val STORY = "story"
+
+const val EXTENSION_PUSH = "extension_push"
+
+const val EXTENSION_PUSH_V2 = "extension_push_v2"
 
 fun NavHostController.navigationSearch(
     defSourceKey: String,
@@ -344,7 +350,10 @@ fun Nav() {
                 Setting(router = router)
             }
 
-            composable(WEB_VIEW_USER) {
+            composable("${WEB_VIEW_USER}?tips={tips}",
+                arguments = listOf(
+                    navArgument("tips") { defaultValue = "" },
+                )) {
                 ScreenShowEvent()
                 DisposableEffect(key1 = Unit) {
                     onDispose {
@@ -352,10 +361,11 @@ fun Nav() {
                     }
                 }
                 runCatching {
+                    val tips = it.arguments?.getString("tips") ?: ""
                     val wb = WebViewHelperV2Impl.webViewRef?.get() ?: throw NullPointerException()
                     val onCheck = WebViewHelperV2Impl.check?.get() ?: throw NullPointerException()
                     val onStop = WebViewHelperV2Impl.stop?.get() ?: throw NullPointerException()
-                    WebViewUser(webView = wb, onCheck = onCheck, onStop = onStop)
+                    WebViewUser(webView = wb, tips = tips, onCheck = onCheck, onStop = onStop)
                 }.onFailure {
                     nav.popBackStack()
                 }
@@ -373,11 +383,33 @@ fun Nav() {
 
             }
 
-            composable(STORY) {
+            composable("${STORY}?defIndex={defIndex}",
+                arguments = listOf(
+                    navArgument("defIndex") {
+                        type = NavType.IntType
+                        defaultValue = 0
+                    }
+                )) {
+                val defSearchKey = it.arguments?.getInt("defIndex", 0) ?: 0
+
                 ScreenShowEvent()
                 NormalSystemBarColor()
                 //Download()
-                Story()
+                Story(defSearchKey)
+            }
+
+            composable(EXTENSION_PUSH) {
+                ScreenShowEvent()
+                NormalSystemBarColor()
+                ExtensionPush()
+                //Download()
+                //ExtensionPush()
+            }
+
+            composable(EXTENSION_PUSH_V2) {
+                ScreenShowEvent()
+                NormalSystemBarColor()
+                ExtensionPushV2()
             }
 
             composable(

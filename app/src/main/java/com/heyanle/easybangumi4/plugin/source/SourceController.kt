@@ -8,6 +8,7 @@ import com.heyanle.easybangumi4.plugin.js.source.JSComponentBundle
 import com.heyanle.easybangumi4.plugin.js.source.JsSource
 import com.heyanle.easybangumi4.plugin.source.bundle.SimpleComponentBundle
 import com.heyanle.easybangumi4.plugin.source.bundle.SourceBundle
+import com.heyanle.easybangumi4.plugin.source.debug.DebugSource
 import com.heyanle.easybangumi4.source_api.Source
 import com.heyanle.easybangumi4.utils.TimeLogUtils
 import com.heyanle.extension_api.NativeSupportedSource
@@ -31,39 +32,36 @@ import java.util.concurrent.Executors
  * 源业务层
  * Created by heyanlin on 2023/10/27.
  */
+@Deprecated("SourceControllerV2")
 class SourceController(
     private val extensionCase: ExtensionCase,
     private val sourcePreferences: SourcePreferences,
     private val cartoonInfoDao: CartoonInfoDao,
-) {
+): ISourceController {
 
     companion object {
         val TAG = "SourceController"
     }
 
-    sealed class SourceInfoState {
-        data object Loading : SourceInfoState()
-
-        class Info(val info: List<SourceInfo>) : SourceInfoState()
-    }
-    private val _extensionSourceInfo = MutableStateFlow<SourceInfoState>(SourceInfoState.Loading)
-    private val _innerSourceInfo = flow<SourceInfoState> {
-        emit(SourceInfoState.Loading)
+   
+    private val _extensionSourceInfo = MutableStateFlow<ISourceController.SourceInfoState>(ISourceController.SourceInfoState.Loading)
+    private val _innerSourceInfo = flow<ISourceController.SourceInfoState> {
+        emit(ISourceController.SourceInfoState.Loading)
         val n = innerSource.map {
             loadSource(it)
         }
-        emit(SourceInfoState.Info(n))
+        emit(ISourceController.SourceInfoState.Info(n))
     }
 
 
-    private val _sourceInfo = MutableStateFlow<SourceInfoState>(SourceInfoState.Loading)
-    val sourceInfo = _sourceInfo.asStateFlow()
+    private val _sourceInfo = MutableStateFlow<ISourceController.SourceInfoState>(ISourceController.SourceInfoState.Loading)
+    override val sourceInfo = _sourceInfo.asStateFlow()
 
     private val _configSource = MutableStateFlow<List<ConfigSource>>(emptyList())
-    val configSource = _configSource.asStateFlow()
+    override val configSource = _configSource.asStateFlow()
 
     private val _sourceBundle = MutableStateFlow<SourceBundle?>(null)
-    val sourceBundle = _sourceBundle.asStateFlow()
+    override val sourceBundle = _sourceBundle.asStateFlow()
 
 
     private val dispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
@@ -71,7 +69,8 @@ class SourceController(
     val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
     private val innerSource = listOf<Source>(
-        LocalSource
+        LocalSource,
+        // DebugSource
     )
 
 
@@ -81,7 +80,7 @@ class SourceController(
             extensionCase.flowExtensionState().collectLatest { sta ->
                 if(sta.loading){
                     _sourceInfo.update {
-                        SourceInfoState.Loading
+                        ISourceController.SourceInfoState.Loading
                     }
                 }else{
                     TimeLogUtils.i("loadSource start")
@@ -102,7 +101,7 @@ class SourceController(
                         res
                     }
                     _extensionSourceInfo.update {
-                        SourceInfoState.Info(n)
+                        ISourceController.SourceInfoState.Info(n)
                     }
                 }
             }
@@ -123,12 +122,12 @@ class SourceController(
                 _extensionSourceInfo,
                 _innerSourceInfo.distinctUntilChanged()
             ) { extensionSource, innerSource ->
-                if (extensionSource is SourceInfoState.Loading || innerSource is SourceInfoState.Loading) {
-                    SourceInfoState.Loading
+                if (extensionSource is ISourceController.SourceInfoState.Loading || innerSource is ISourceController.SourceInfoState.Loading) {
+                    ISourceController.SourceInfoState.Loading
                 } else {
-                    val e = extensionSource as SourceInfoState.Info
-                    val i = innerSource as SourceInfoState.Info
-                    SourceInfoState.Info(e.info + i.info)
+                    val e = extensionSource as ISourceController.SourceInfoState.Info
+                    val i = innerSource as ISourceController.SourceInfoState.Info
+                    ISourceController.SourceInfoState.Info(e.info + i.info)
                 }
 
             }.collectLatest { n ->
@@ -139,7 +138,7 @@ class SourceController(
         }
         scope.launch {
             combine(
-                _sourceInfo.filterIsInstance<SourceInfoState.Info>().map {
+                _sourceInfo.filterIsInstance<ISourceController.SourceInfoState.Info>().map {
                     it.info
                 },
                 sourcePreferences.configs.requestFlow.distinctUntilChanged()

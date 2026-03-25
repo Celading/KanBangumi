@@ -2,50 +2,33 @@ package com.heyanle.easybangumi4.ui.source_manage.extension
 
 import android.app.Activity
 import androidx.activity.compose.BackHandler
-import androidx.collection.emptyIntObjectMap
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -54,7 +37,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -66,19 +48,17 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heyanle.easy_i18n.R
+import com.heyanle.easybangumi4.EXTENSION_PUSH
 import com.heyanle.easybangumi4.LocalNavController
 import com.heyanle.easybangumi4.plugin.extension.ExtensionInfo
 import com.heyanle.easybangumi4.ui.common.EasyDeleteDialog
 import com.heyanle.easybangumi4.ui.common.FastScrollToTopFab
 import com.heyanle.easybangumi4.ui.common.LoadingPage
 import com.heyanle.easybangumi4.ui.common.OkImage
-import com.heyanle.easybangumi4.ui.common.moeDialog
-import com.heyanle.easybangumi4.utils.openUrl
 
 /**
  * Created by HeYanLe on 2023/2/21 23:33.
@@ -136,14 +116,13 @@ fun ExtensionTopAppBar(behavior: TopAppBarScrollBehavior) {
                         }
                     }
                 }
-
-
                 TextField(keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = {}),
                     maxLines = 1,
                     modifier = Modifier.focusRequester(focusRequester),
-                    colors = TextFieldDefaults.textFieldColors(
-                        containerColor = Color.Transparent,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
                         focusedIndicatorColor = Color.Transparent,
                     ),
@@ -164,6 +143,15 @@ fun ExtensionTopAppBar(behavior: TopAppBarScrollBehavior) {
         },
         actions = {
             if (!isSearch) {
+                IconButton(onClick = {
+                    nav.navigate(EXTENSION_PUSH)
+                }) {
+                    Icon(
+                        imageVector = Icons.Filled.Add, stringResource(id = R.string.extension_push)
+                    )
+                }
+
+
                 IconButton(onClick = {
                     vm.onSearchChange("")
                 }) {
@@ -197,28 +185,23 @@ fun Extension() {
     if (sta.isLoading) {
         LoadingPage(modifier = Modifier.fillMaxSize())
     } else {
-        Column {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize(),
+            contentPadding = PaddingValues(0.dp, 0.dp, 0.dp, 60.dp),
+            state = listState
+        ) {
+            items(sta.showList) {
+                ExtensionInfoItem(it,
+                    onClick = {
+                        (ctx as? Activity)?.let { act ->
+                            vm.onItemClick(it, act)
+                        }
 
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(0.dp, 0.dp, 0.dp, 60.dp),
-                state = listState
-            ) {
-                items(sta.showList) {
-                    ExtensionInfoItem(it,
-                        onClick = {
-                            (ctx as? Activity)?.let { act ->
-                                vm.onItemClick(it, act)
-                            }
-
-                        }, onLongPress = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            vm.onItemLongPress(it)
-                        })
-                }
+                    }, onLongPress = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        vm.onItemLongPress(it)
+                    })
             }
         }
 
@@ -257,62 +240,40 @@ fun ExtensionInfoItem(
             Text(text = extension.label)
         },
         supportingContent = {
-            LazyRow(
+            Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                item {
-                    // 版本
-                    Text(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondaryContainer)
-                            .clickable {
-                            }
-                            .padding(8.dp, 4.dp),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        fontWeight = FontWeight.W900,
-                        text = extension.versionName,
-                        fontSize = 12.sp
-                    )
-                }
-                item {
-                    // 加载方式
-                    Text(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondaryContainer)
-                            .clickable {
-                            }
-                            .padding(8.dp, 4.dp),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        fontWeight = FontWeight.W900,
-                        text = when(extension.loadType){
-                            ExtensionInfo.TYPE_APK_INSTALL -> {stringResource(id = com.heyanle.easy_i18n.R.string.load_type_installed)}
-                            ExtensionInfo.TYPE_APK_FILE -> {stringResource(id = com.heyanle.easy_i18n.R.string.load_type_file_apk)}
-                            ExtensionInfo.TYPE_JS_FILE -> {stringResource(id = com.heyanle.easy_i18n.R.string.load_type_file_js)}
-                            else -> {stringResource(id = com.heyanle.easy_i18n.R.string.load_type_installed)}
-                        },
-                        fontSize = 12.sp
-                    )
-                }
-//                item {
-//                    Text(
-//                        modifier = Modifier
-//                            .clip(CircleShape)
-//                            .background(MaterialTheme.colorScheme.secondaryContainer)
-//                            .clickable {
-//                            }
-//                            .padding(8.dp, 4.dp),
-//                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-//                        fontWeight = FontWeight.W900,
-//                        text = when(extension.loadType){
-//                            Extension.TYPE_APP -> {extension.pkgName}
-//                            Extension.TYPE_FILE -> {extension.fileName}
-//                            else -> {stringResource(id = com.heyanle.easy_i18n.R.string.load_type_installed)}
-//                        },
-//                        fontSize = 12.sp
-//                    )
-//                }
+                // 版本
+                Text(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clickable {
+                        }
+                        .padding(8.dp, 4.dp),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    fontWeight = FontWeight.W900,
+                    text = extension.versionName,
+                    fontSize = 12.sp
+                )
+                // 加载方式
+                Text(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clickable {
+                        }
+                        .padding(8.dp, 4.dp),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    fontWeight = FontWeight.W900,
+                    text = when(extension.loadType){
+                        ExtensionInfo.TYPE_APK_INSTALL -> {stringResource(id = com.heyanle.easy_i18n.R.string.load_type_installed)}
+                        ExtensionInfo.TYPE_APK_FILE -> {stringResource(id = com.heyanle.easy_i18n.R.string.load_type_file_apk)}
+                        ExtensionInfo.TYPE_JS_FILE -> {stringResource(id = com.heyanle.easy_i18n.R.string.load_type_file_js)}
+                        else -> {stringResource(id = com.heyanle.easy_i18n.R.string.load_type_installed)}
+                    },
+                    fontSize = 12.sp
+                )
             }
         },
         trailingContent = {

@@ -27,13 +27,103 @@ class JsSource(
             importPackage(Packages.com.heyanle.easybangumi4.plugin.extension);
             importPackage(Packages.com.heyanle.easybangumi4.plugin.js.runtime);
             importPackage(Packages.com.heyanle.easybangumi4.plugin.js.entity);
-            importPackage(Packages.org.jsoup);
-            importPackage(Packages.okhttp3);
+            importPackage(Packages.com.heyanle.easybangumi4.source_api);
             importPackage(Packages.com.heyanle.easybangumi4.source_api.utils.api);
             importPackage(Packages.com.heyanle.easybangumi4.source_api.entity);
+            importPackage(Packages.com.heyanle.easybangumi4.plugin.js.utils);
+            importPackage(Packages.com.heyanle.easybangumi4.source_api.component.preference);
+            
             importPackage(Packages.kotlin.text);
             importPackage(Packages.kotlin);
+            
             importPackage(Packages.java.util);
+            importPackage(Packages.java.lang);
+            importPackage(Packages.java.net);
+            
+            importPackage(Packages.org.jsoup);
+            importPackage(Packages.org.json);
+            importPackage(Packages.okhttp3);
+            
+            importPackage(Packages.javax.crypto);
+           
+           
+            
+            var Log = JSLogUtils;
+            var SourceUtils = JSSourceUtils;
+            var source = Inject_Source;
+         
+            
+            function makeCartoonCover(map) {
+                var id = map.id;
+                var source = Inject_Source.key;
+                var url = map.url;
+                var title = map.title;
+                var intro = map.intro;
+                var cover = map.cover;
+                return new CartoonCoverImpl(id, source, url, title, intro, cover);
+            }
+            
+            function makeCartoon(map) {
+                var id = map.id;
+                var source = Inject_Source.key;
+                var url = map.url;
+                
+                var title = map.title;
+                
+                
+                var genre = null;
+                var coverUrl = null;
+                var intro = null;
+                var description = null;
+                var updateStrategy = 0;
+                var isUpdate = false;
+                var status = 0;
+                
+                if (map.genreList != undefined) {
+                    var stringBuilder = new StringBuilder();
+                    for (var i = 0 ; i < map.genreList.length; i++) {
+                        stringBuilder.append(map.genreList[i]);
+                        if(i != map.genreList.length - 1) {
+                            stringBuilder.append(", ");
+                        }
+                    }
+                    genre = stringBuilder.toString();
+                }
+                
+                if (map.genre != undefined) {
+                    genre = map.genre;
+                }
+                
+              
+                if (map.cover != undefined) {
+                    coverUrl = map.cover;
+                }
+                
+                if (map.intro != undefined) {
+                    intro = map.intro;
+                }
+                
+               
+                if (map.description != undefined) {
+                    description = map.description;
+                }
+                
+                if (map.updateStrategy != undefined) {
+                    updateStrategy = map.updateStrategy;
+                }
+                
+                if (map.isUpdate != undefined) {
+                    isUpdate = map.isUpdate;
+                }
+                
+                if (map.status != undefined) {
+                    status = map.status;
+                }
+                
+                return new CartoonImpl(
+                    id, source, url, title, genre, coverUrl, intro, description, updateStrategy, isUpdate, status
+                );
+            }
         """
     }
 
@@ -44,6 +134,10 @@ class JsSource(
         } else {
             js.toString()
         }
+    }
+
+    fun getJsFile(): File? {
+        return js as? File
     }
 
 

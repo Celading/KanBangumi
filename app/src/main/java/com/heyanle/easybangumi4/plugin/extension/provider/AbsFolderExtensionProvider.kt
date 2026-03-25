@@ -1,13 +1,10 @@
 package com.heyanle.easybangumi4.plugin.extension.provider
 
-import android.content.Context
 import android.os.Build
 import android.os.FileObserver
 import androidx.annotation.RequiresApi
 import com.heyanle.easybangumi4.plugin.extension.ExtensionInfo
 import com.heyanle.easybangumi4.plugin.extension.loader.ExtensionLoader
-import com.heyanle.easybangumi4.plugin.extension.loader.ExtensionLoaderFactory
-import com.heyanle.easybangumi4.plugin.extension.loader.FileExtensionLoader
 import com.heyanle.easybangumi4.utils.TimeLogUtils
 import com.heyanle.easybangumi4.utils.logi
 import kotlinx.coroutines.CoroutineDispatcher
@@ -62,14 +59,14 @@ abstract class AbsFolderExtensionProvider(
             val file = File(folderPath)
             val fileList = if (file.exists() && file.isDirectory) {
                 file.listFiles()?.filter {
-                    it != null && it.isFile && it.name.endsWith(FileApkExtensionProvider.EXTENSION_SUFFIX)
+                    it != null && it.isFile && checkName(it.name)
                 }
             }else {
                 emptyList()
             } ?: emptyList()
 
 
-            val extensionInfos = coverExtensionLoaderList(getExtensionLoader(fileList)).map {
+            val extensionInfos = coverExtensionLoaderList(loadExtensionLoader(fileList)).map {
                 it.load()
             }.filterIsInstance<ExtensionInfo>()
 
@@ -82,19 +79,41 @@ abstract class AbsFolderExtensionProvider(
             fileObserver.startWatching()
         }
     }
-    
-    abstract fun getSuffix(): String
-    abstract fun getExtensionLoader(fileList: List<File>): List<ExtensionLoader>
+
+    abstract fun checkName(displayName: String): Boolean
+    abstract fun getNameWhenLoad(displayName: String, time: Long, atomicLong: Long): String
+
+    abstract fun loadExtensionLoader(fileList: List<File>): List<ExtensionLoader>
 
     open fun coverExtensionLoaderList(loaderList: List<ExtensionLoader>): List<ExtensionLoader> {
         return loaderList;
+    }
+
+    fun stopWatching() {
+        fileObserver.stopWatching()
+    }
+
+    fun startWatching() {
+        fileObserver.startWatching()
     }
 
     fun appendExtensionPath(path: String, callback: ((Exception?) -> Unit)? = null) {
         scope.launch {
             try {
                 val inputStream = File(path).inputStream()
-                innerAppendExtension(inputStream)
+                innerAppendExtension(path, inputStream)
+                callback?.invoke(null)
+            } catch (e: IOException) {
+                e.printStackTrace()
+                callback?.invoke(e)
+            }
+        }
+    }
+
+    fun appendExtensionStream(displayName: String, inputStream: InputStream, callback: ((Exception?) -> Unit)? = null) {
+        scope.launch {
+            try {
+                innerAppendExtension(displayName, inputStream)
                 callback?.invoke(null)
             } catch (e: IOException) {
                 e.printStackTrace()
@@ -106,9 +125,10 @@ abstract class AbsFolderExtensionProvider(
     /**
      * 调用完后 inputSteam 会自动 close
      */
-    protected fun innerAppendExtension(inputStream: InputStream) {
-        val fileName =
-            "${System.currentTimeMillis()}-${atomicLong.getAndIncrement()}${getSuffix()}"
+    protected open fun innerAppendExtension(displayName: String, inputStream: InputStream) {
+        fileObserver.stopWatching()
+        val fileName = getNameWhenLoad(displayName, System.currentTimeMillis(), atomicLong.getAndIncrement())
+            // "${System.currentTimeMillis()}-${atomicLong.getAndIncrement()}${getSuffix()}"
         val cacheFile = File(cacheFolder, fileName)
         val targetFile = File(folderPath, fileName)
         val targetFileTemp = File(folderPath, "${fileName}.temp")
@@ -120,13 +140,15 @@ abstract class AbsFolderExtensionProvider(
             }
         }
         cacheFile.deleteOnExit()
-        val loader = getExtensionLoader(listOf(cacheFile)).firstOrNull() ?: return
+        val loader = loadExtensionLoader(listOf(cacheFile)).firstOrNull() ?: return
         if (loader.canLoad()) {
             cacheFile.copyTo(targetFileTemp)
             targetFileTemp.renameTo(targetFile)
         }
         cacheFolderFile.deleteRecursively()
         cacheFolderFile.mkdirs()
+        scanFolder()
+        fileObserver.startWatching()
     }
 
 
@@ -144,10 +166,7 @@ abstract class AbsFolderExtensionProvider(
     // 文件观察
 
     protected fun onEvent(event: Int, path: String) {
-        if (event and FileObserver.DELETE == FileObserver.DELETE || event and FileObserver.DELETE_SELF == FileObserver.DELETE_SELF || path.endsWith(
-                getSuffix()
-            )
-        ) {
+        if (event and FileObserver.DELETE == FileObserver.DELETE || event and FileObserver.DELETE_SELF == FileObserver.DELETE_SELF || checkName(path)) {
             scanFolder()
         }
     }

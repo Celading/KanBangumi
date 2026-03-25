@@ -3,10 +3,11 @@ package com.heyanle.easybangumi4.ui.common.page.list
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -21,14 +22,12 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
-import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -43,7 +42,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.itemKey
 import com.heyanle.easybangumi4.LocalNavController
 import com.heyanle.easybangumi4.navigationDetailed
 import com.heyanle.easybangumi4.source_api.component.page.SourcePage
@@ -52,8 +50,10 @@ import com.heyanle.easybangumi4.source_api.entity.toIdentify
 import com.heyanle.easybangumi4.ui.common.CartoonCardWithCover
 import com.heyanle.easybangumi4.ui.common.CartoonCardWithoutCover
 import com.heyanle.easybangumi4.ui.common.PagingCommon
+import com.heyanle.easybangumi4.ui.common.commonShow
 import com.heyanle.easybangumi4.ui.common.pagingCommon
-import com.heyanle.easybangumi4.ui.main.star.CoverStarViewModel
+import com.heyanle.easybangumi4.ui.common.cover_star.CoverStarViewModel
+import io.ktor.http.headersOf
 
 /**
  * Created by heyanlin on 2024/2/9 10:29.
@@ -66,7 +66,7 @@ fun SourceListPage(
     lazyGridState: LazyGridState,
     lazyStaggeredGridState: LazyStaggeredGridState,
 ) {
-    val star = coverStarVm.setFlow.collectAsState(initial = setOf<String>())
+    val star = coverStarVm.stateFlow.collectAsState().value.identifySet
     val nav = LocalNavController.current
     val haptic = LocalHapticFeedback.current
     val vm =
@@ -95,29 +95,31 @@ fun SourceListPage(
             horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
             contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 88.dp)
         ) {
-            item(
-                span = {
-                    GridItemSpan(maxLineSpan)
-                }
-            ) {
-                SourceListGroupTab(
-                    list = pageList,
-                    curPage = vm.selected.intValue,
-                    lazyListState = lazyListState,
-                    onClick = {
-                        vm.selected.intValue = it
+            if (pagingItems?.commonShow() != true) {
+                item(
+                    span = {
+                        GridItemSpan(maxLineSpan)
                     }
-                )
+                ) {
+                    SourceListGroupTab(
+                        list = pageList,
+                        curPage = vm.selected.intValue,
+                        lazyListState = lazyListState,
+                        onClick = {
+                            vm.selected.intValue = it
+                        }
+                    )
+                }
             }
             pagingItems?.let { pagingItems ->
                 listPageWithCover(
                     pagingItems,
-                    star.value,
+                    star,
                     onClick = {
                         nav.navigationDetailed(it)
                     },
                     onLongPress = {
-                        coverStarVm.star(it)
+                        coverStarVm.dispatchStar(it)
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     }
                 )
@@ -136,27 +138,30 @@ fun SourceListPage(
             contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 88.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            item(
-                span = StaggeredGridItemSpan.FullLine
-            ) {
-                SourceListGroupTab(
-                    list = pageList,
-                    curPage = vm.selected.intValue,
-                    lazyListState = lazyListState,
-                    onClick = {
-                        vm.selected.intValue = it
-                    }
-                )
+            if (pagingItems?.commonShow() != true) {
+                item(
+                    span = StaggeredGridItemSpan.FullLine
+                ) {
+                    SourceListGroupTab(
+                        list = pageList,
+                        curPage = vm.selected.intValue,
+                        lazyListState = lazyListState,
+                        onClick = {
+                            vm.selected.intValue = it
+                        }
+                    )
+                }
             }
+
             pagingItems?.let {
                 listPageWithoutCover(
                     pagingItems,
-                    star.value,
+                    star,
                     onClick = {
                         nav.navigationDetailed(it)
                     },
                     onLongPress = {
-                        coverStarVm.star(it)
+                        coverStarVm.dispatchStar(it)
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     }
                 )
@@ -166,7 +171,17 @@ fun SourceListPage(
     }
 
     pagingItems?.let {
-        PagingCommon(items = it)
+        PagingCommon(items = it){
+            Spacer(Modifier.size(4.dp))
+            SourceListGroupTab(
+                list = pageList,
+                curPage = vm.selected.intValue,
+                lazyListState = lazyListState,
+                onClick = {
+                    vm.selected.intValue = it
+                }
+            )
+        }
     }
 
 
@@ -180,7 +195,7 @@ fun SourceListPage(
     lazyStaggeredGridState: LazyStaggeredGridState,
     vm: SourceListViewModel
 ) {
-    val star = coverStarVm.setFlow.collectAsState(initial = setOf<String>())
+    val star = coverStarVm.stateFlow.collectAsState().value.identifySet
     val nav = LocalNavController.current
     val haptic = LocalHapticFeedback.current
     val pagingItems = vm.curPager.value.collectAsLazyPagingItems()
@@ -197,12 +212,12 @@ fun SourceListPage(
         ) {
             listPageWithCover(
                 pagingItems,
-                star.value,
+                star,
                 onClick = {
                     nav.navigationDetailed(it)
                 },
                 onLongPress = {
-                    coverStarVm.star(it)
+                    coverStarVm.dispatchStar(it)
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 }
             )
@@ -219,12 +234,12 @@ fun SourceListPage(
         ) {
             listPageWithoutCover(
                 pagingItems,
-                star.value,
+                star,
                 onClick = {
                     nav.navigationDetailed(it)
                 },
                 onLongPress = {
-                    coverStarVm.star(it)
+                    coverStarVm.dispatchStar(it)
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 }
             )
@@ -233,7 +248,7 @@ fun SourceListPage(
     }
 
 
-    PagingCommon(items = pagingItems)
+    PagingCommon(items = pagingItems, extMsg = "\n可尝试点击左上角切换其他源")
 }
 
 @Composable

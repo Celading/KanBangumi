@@ -1,6 +1,7 @@
 package com.heyanle.easybangumi4.plugin.source
 
 import android.app.Application
+import android.webkit.CookieManager
 import com.heyanle.easybangumi4.base.hekv.HeKV
 import com.heyanle.easybangumi4.plugin.source.utils.CaptchaHelperImpl
 import com.heyanle.easybangumi4.plugin.source.utils.NativeHelperImpl
@@ -10,6 +11,9 @@ import com.heyanle.easybangumi4.plugin.source.utils.network.NetworkHelperImpl
 import com.heyanle.easybangumi4.plugin.source.utils.network.OkhttpHelperImpl
 import com.heyanle.easybangumi4.plugin.source.utils.network.WebViewHelperImpl
 import com.heyanle.easybangumi4.plugin.source.utils.network.WebViewHelperV2Impl
+import com.heyanle.easybangumi4.plugin.source.utils.network.web.WebProxyManager
+import com.heyanle.easybangumi4.plugin.source.utils.network.web.WebProxyProvider
+import com.heyanle.easybangumi4.setting.SettingMMKVPreferences
 
 import com.heyanle.easybangumi4.source_api.utils.api.CaptchaHelper
 import com.heyanle.easybangumi4.source_api.utils.api.NetworkHelper
@@ -18,6 +22,7 @@ import com.heyanle.easybangumi4.source_api.utils.api.PreferenceHelper
 import com.heyanle.easybangumi4.source_api.utils.api.StringHelper
 import com.heyanle.easybangumi4.source_api.utils.api.WebViewHelper
 import com.heyanle.easybangumi4.source_api.utils.api.WebViewHelperV2
+import com.heyanle.easybangumi4.utils.WebViewManager
 import com.heyanle.easybangumi4.utils.getFilePath
 import com.heyanle.inject.api.InjectModule
 import com.heyanle.inject.api.InjectScope
@@ -34,12 +39,26 @@ class SourceModule(
 
     override fun InjectScope.registerInjectables() {
 
+
+
         addSingletonFactory {
             NativeHelperImpl(application)
         }
 
+        addSingletonFactory<ISourceController> {
+            val mmkvSetting = get<SettingMMKVPreferences>()
+            if (mmkvSetting.extensionV2Temp) {
+                get<SourceControllerV2>()
+            } else {
+                get<SourceController>()
+            }
+        }
+
         addSingletonFactory {
             SourceController(get(), get(), get())
+        }
+        addSingletonFactory {
+            SourceControllerV2(get(), get())
         }
 
 
@@ -79,13 +98,26 @@ class SourceModule(
             WebViewHelperImpl(get(it))
         }
 
+        addSingletonFactory {
+            WebViewManager(CookieManager.getInstance())
+        }
         // WebViewHelperV2
         addSingletonFactory<WebViewHelperV2Impl> {
-            WebViewHelperV2Impl()
+            WebViewHelperV2Impl(get())
         }
         addScopedPerKeyFactory<WebViewHelperV2, String> {
             get<WebViewHelperV2Impl>()
         }
+
+        // webProxy
+        addScopedPerKeyFactory<WebProxyProvider, WebProxyManager> {
+            WebProxyProvider(it, get())
+        }
+
+        addScopedPerKeyFactory<WebProxyManager, String> {
+            WebProxyManager()
+        }
+
 
     }
 }

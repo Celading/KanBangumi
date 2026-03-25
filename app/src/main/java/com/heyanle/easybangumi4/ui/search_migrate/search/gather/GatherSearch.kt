@@ -29,17 +29,21 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.heyanle.easy_i18n.R
 import com.heyanle.easybangumi4.LocalNavController
 import com.heyanle.easybangumi4.navigationDetailed
 import com.heyanle.easybangumi4.plugin.source.LocalSourceBundleController
+import com.heyanle.easybangumi4.source_api.component.SearchNeedWebViewCheckBusinessException
 import com.heyanle.easybangumi4.source_api.entity.CartoonCover
 import com.heyanle.easybangumi4.source_api.entity.toIdentify
 import com.heyanle.easybangumi4.ui.common.CartoonCardWithCover
 import com.heyanle.easybangumi4.ui.common.PagingCommon
+import com.heyanle.easybangumi4.ui.common.PagingCommonSourceSearch
 import com.heyanle.easybangumi4.ui.common.pagingCommonHor
-import com.heyanle.easybangumi4.ui.main.star.CoverStarViewModel
+import com.heyanle.easybangumi4.ui.common.cover_star.CoverStarViewModel
+import com.heyanle.easybangumi4.ui.common.pagingCommonSourceSearchHor
 import com.heyanle.easybangumi4.ui.search_migrate.search.SearchViewModel
 
 /**
@@ -66,8 +70,6 @@ fun ColumnScope.GatherSearch(
 
     Divider()
 
-
-
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
@@ -85,9 +87,21 @@ fun ColumnScope.GatherSearch(
     ) {
         itemList.value?.let {
             items(it) {
-                MigrateSourceItem(sourceItem = it, starVm = starVm){
-                    nav.navigationDetailed(it)
-                }
+                MigrateSourceItem(
+                    sourceItem = it,
+                    starVm = starVm,
+                    onClick = {
+                        nav.navigationDetailed(it)
+                    },
+                    onWebCheck = { exce, page ->
+                        vm.onSearchNeedWebCheck(
+                            exce,
+                            onRetry = {
+                                page.retry()
+                            }
+                        )
+                    }
+                )
             }
         }
 
@@ -100,10 +114,12 @@ fun MigrateSourceItem(
     starVm: CoverStarViewModel,
     supportLongTouchStart: Boolean = true,
     onClick: (CartoonCover)->Unit,
-) {
+    onWebCheck: ((SearchNeedWebViewCheckBusinessException,LazyPagingItems<CartoonCover>  ) -> Unit) ?= null,
+
+    ) {
     val page = sourceItem.flow.collectAsLazyPagingItems()
     val haptic = LocalHapticFeedback.current
-    val set = starVm.setFlow.collectAsState(initial = setOf<String>())
+    val set = starVm.stateFlow.collectAsState().value.identifySet
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -127,14 +143,14 @@ fun MigrateSourceItem(
                     page[it]?.let {
                         CartoonCardWithCover(
                             modifier = Modifier.width(100.dp),
-                            star = set.value.contains(it.toIdentify()),
+                            star = set.contains(it.toIdentify()),
                             cartoonCover = it,
                             onClick = {
                                onClick(it)
                             },
                             onLongPress = if (supportLongTouchStart) {
                                 {
-                                    starVm.star(it)
+                                    starVm.dispatchStar(it)
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 }
                             } else null,
@@ -142,10 +158,23 @@ fun MigrateSourceItem(
                     }
 
                 }
-                pagingCommonHor(page)
+                if (onWebCheck != null) {
+                    pagingCommonSourceSearchHor(page, onWebCheck = {
+                        onWebCheck(it, page)
+                    } )
+                } else {
+                    pagingCommonHor(page)
+                }
+
             }
         }
-        PagingCommon(items = page)
+        if (onWebCheck != null) {
+            PagingCommonSourceSearch(items = page, onWebCheck = {
+                onWebCheck(it, page)
+            })
+        } else {
+            PagingCommon(items = page)
+        }
 
     }
 }

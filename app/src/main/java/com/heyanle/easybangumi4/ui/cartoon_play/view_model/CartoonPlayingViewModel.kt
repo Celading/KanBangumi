@@ -10,6 +10,8 @@ import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.C
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -19,11 +21,18 @@ import com.heyanle.easybangumi4.cartoon.story.local.source.LocalSource
 import com.heyanle.easybangumi4.case.SourceStateCase
 import com.heyanle.easybangumi4.exo.CartoonMediaSourceFactory
 import com.heyanle.easybangumi4.exo.thumbnail.ThumbnailBuffer
+import com.heyanle.easybangumi4.plugin.js.component.getPlayInfoWithCheck
+import com.heyanle.easybangumi4.plugin.source.utils.network.WebViewHelperV2Impl
+import com.heyanle.easybangumi4.plugin.source.utils.network.web.IWebProxy
 import com.heyanle.easybangumi4.setting.SettingPreferences
+import com.heyanle.easybangumi4.source_api.component.PlayInfoNeedWebViewCheckBusinessException
+import com.heyanle.easybangumi4.source_api.component.SearchNeedWebViewCheckBusinessException
+import com.heyanle.easybangumi4.source_api.entity.CartoonSummary
 import com.heyanle.easybangumi4.source_api.entity.Episode
 import com.heyanle.easybangumi4.source_api.entity.PlayLine
 import com.heyanle.easybangumi4.source_api.entity.PlayerInfo
 import com.heyanle.easybangumi4.ui.cartoon_play.cartoon_recorded.CartoonRecordedModel
+import com.heyanle.easybangumi4.ui.common.moeSnackBar
 import com.heyanle.easybangumi4.utils.CoroutineProvider
 import com.heyanle.easybangumi4.utils.MediaAndroidUtils
 import com.heyanle.easybangumi4.utils.getCachePath
@@ -314,10 +323,20 @@ class CartoonPlayingViewModel(
         })
     }
 
+    val webViewHelperV2Impl: WebViewHelperV2Impl by Inject.injectLazy()
+
+    // 很 hard 但是不管了
+    private var webProxyTemp: IWebProxy? = null
+    private var webTempSummary: CartoonSummary? = null
+    private var webTempLine: PlayLine? = null
+    private var webTempEpisode: Episode? = null
+
+
     private suspend fun innerPlay(
         cartoonPlayingState: CartoonPlayViewModel.CartoonPlayState,
         adviceProcess: Long,
     ) {
+
 
         exoPlayer.pause()
         _playingState.update {
@@ -336,11 +355,36 @@ class CartoonPlayingViewModel(
             }
             return
         }
-        play.getPlayInfo(
-            cartoonPlayingState.cartoonSummary,
-            cartoonPlayingState.playLine.playLine,
-            cartoonPlayingState.episode
-        )
+
+        val tw = webProxyTemp
+        val tsummary = webTempSummary
+        val tline = webTempLine
+        val tepisode = webTempEpisode
+        if (tw != null && tsummary != null && tline != null && tepisode != null &&
+            tsummary == cartoonPlayingState.cartoonSummary
+            && tline == cartoonPlayingState.playLine.playLine
+            && tepisode == cartoonPlayingState.episode
+            ) {
+            play.getPlayInfoWithCheck(
+                cartoonPlayingState.cartoonSummary,
+                cartoonPlayingState.playLine.playLine,
+                cartoonPlayingState.episode,
+                tw,
+            )
+        } else {
+            runCatching {
+                webProxyTemp?.close()
+            }
+            webProxyTemp = null
+            webTempSummary = null
+            webTempLine = null
+            webTempEpisode = null
+            play.getPlayInfo(
+                cartoonPlayingState.cartoonSummary,
+                cartoonPlayingState.playLine.playLine,
+                cartoonPlayingState.episode
+            )
+        }
             .complete {
                 yield()
                 it.data.uri.logi("CartoonPlayingViewModel")
@@ -348,18 +392,40 @@ class CartoonPlayingViewModel(
                 playingEpisode = cartoonPlayingState.episode
                 innerPlay(it.data, adviceProcess)
             }
-            .error {
+            .error { state ->
                 yield()
                 _playingState.update {
                     it.copy(
                         isLoading = false,
                         isError = true,
-                        errorMsg = it.errorMsg,
-                        errorThrowable = it.errorThrowable
+                        errorMsg = state.throwable?.message?:"解析失败",
+                        errorThrowable = state.throwable
                     )
                 }
             }
 
+
+    }
+
+    fun onSearchNeedWebCheck(
+        playInfoNeedWebViewCheckBusinessException: PlayInfoNeedWebViewCheckBusinessException,
+    ){
+        val param = playInfoNeedWebViewCheckBusinessException.param
+        val webProxy = param.iWebProxy
+        val webView = webProxy.getWebView()
+        if (webView == null) {
+            "WebView is null".moeSnackBar()
+            tryRefresh()
+            return
+        }
+        webViewHelperV2Impl.openWebPage(
+            webView = webView,
+            tips = param.tips ?: "",
+            onCheck = { false },
+            onStop = {
+                tryRefresh()
+            },
+        )
 
     }
 
@@ -402,6 +468,7 @@ class CartoonPlayingViewModel(
                 cartoonMediaSourceFactory.getWithCache(playerInfo)
         exoPlayer.setMediaSource(media, adviceProcess)
         exoPlayer.prepare()
+        duringTemp = -1L
         exoPlayer.playWhenReady = true
         _playingState.update {
             it.copy(
@@ -411,36 +478,58 @@ class CartoonPlayingViewModel(
             )
         }
     }
-
-
+    var duringTemp = -1L
     fun trySaveHistory(ps: Long = -1) {
+
+        "save1".logi(TAG)
         val line = playingPlayLine ?: return
         val epi = playingEpisode ?: return
         val cartoon = cartoonPlayingState?.cartoonSummary ?: return
-        scope.launch {
-            val old = cartoonInfoDao.getByCartoonSummary(cartoon.id, cartoon.source)
-            if (old != null) {
-                val lineIndex = old.playLine.indexOf(line)
-                if (lineIndex >= 0) {
-                    cartoonInfoDao.modify(
-                        old.copyHistory(
-                            lineIndex,
-                            line,
-                            epi,
-                            if (ps >= 0) ps else exoPlayer.currentPosition
-                        )
-                    )
-                }
+        CoroutineProvider.globalMainScope.launch {
 
+            runCatching {
+                var po = if (ps >= 0) ps else exoPlayer.currentPosition
+                when (exoPlayer.playbackState) {
+                    Player.STATE_BUFFERING, Player.STATE_READY -> {
+                        po = exoPlayer.currentPosition
+                    }
+                    Player.STATE_ENDED -> {
+                        if (duringTemp > 0) {
+                            po = duringTemp
+                        } else {
+                            return@launch
+                        }
+                    }
+                }
+                "save $po".logi(TAG)
+//            if (exoPlayer.playbackState == ExoPlayer.STATE_ENDED)
+                val process = po
+                cartoonInfoDao.transaction {
+                    val old = cartoonInfoDao.getByCartoonSummary(cartoon.id, cartoon.source)
+                    if (old != null) {
+                        val lineIndex = old.playLine.indexOf(line)
+                        if (lineIndex >= 0) {
+                            cartoonInfoDao.modify(
+                                old.copyHistory(
+                                    lineIndex,
+                                    line,
+                                    epi,
+                                    process
+
+                                )
+                            )
+                        }
+
+                    }
+                }
             }
+
         }
     }
 
     // onDispose
     fun onExit() {
-        if (_playingState.value.isPlaying && !exoPlayer.playWhenReady && exoPlayer.isMedia()) {
-            trySaveHistory()
-        }
+        trySaveHistory()
         lastJob?.cancel()
         exoPlayer.pause()
     }
@@ -449,9 +538,14 @@ class CartoonPlayingViewModel(
 
     override fun onPlaybackStateChanged(playbackState: Int) {
         super.onPlaybackStateChanged(playbackState)
+        if (playbackState == Player.STATE_READY) {
+            exoPlayer.duration.logi(TAG)
+            duringTemp = exoPlayer.duration
+        }
         if (_playingState.value.isPlaying && !exoPlayer.playWhenReady && exoPlayer.isMedia()) {
             trySaveHistory()
         }
+
 
     }
 
@@ -462,11 +556,18 @@ class CartoonPlayingViewModel(
         }
     }
 
+
     // ViewModel clear
 
     override fun onCleared() {
         super.onCleared()
         lastJob?.cancel()
+        try {
+            trySaveHistory()
+        }catch (e: Throwable) {
+            e.printStackTrace()
+        }
+
         scope.cancel()
         exoPlayer.release()
     }

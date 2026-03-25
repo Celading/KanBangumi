@@ -3,6 +3,7 @@ package com.heyanle.easybangumi4
 import android.content.Context
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.heyanle.easybangumi4.base.json.JsonFileProvider
 import com.heyanle.easybangumi4.base.preferences.android.AndroidPreferenceStore
 import com.heyanle.easybangumi4.base.preferences.hekv.HeKVPreferenceStore
 import com.heyanle.easybangumi4.base.preferences.mmkv.MMKVPreferenceStore
@@ -18,6 +19,13 @@ import com.heyanle.easybangumi4.cartoon.old.repository.db.AppDatabase
 import com.heyanle.easybangumi4.cartoon.old.repository.db.CacheDatabase
 import com.heyanle.easybangumi4.cartoon.repository.db.CartoonDatabase
 import com.heyanle.easybangumi4.cartoon.star.CartoonStarController
+import com.heyanle.easybangumi4.plugin.extension.ExtensionInfo
+import com.heyanle.easybangumi4.plugin.extension.loader.ExtensionLoaderFactory
+import com.heyanle.easybangumi4.plugin.extension.provider.JsExtensionProvider
+import com.heyanle.easybangumi4.plugin.extension.provider.JsExtensionProviderV2
+import com.heyanle.easybangumi4.plugin.js.extension.JSExtensionCryLoader
+import com.heyanle.easybangumi4.plugin.js.extension.JSExtensionLoader
+import com.heyanle.easybangumi4.plugin.js.runtime.JSRuntimeProvider
 import com.heyanle.easybangumi4.setting.SettingMMKVPreferences
 import com.heyanle.easybangumi4.setting.SettingPreferences
 import com.heyanle.easybangumi4.plugin.source.SourceConfig
@@ -150,7 +158,7 @@ object Migrate {
 
 
 
-        if (lastVersionCode < curVersionCode) {
+        if (lastVersionCode < curVersionCode || BuildConfig.DEBUG) {
 
             scope.launch(Dispatchers.IO) {
 
@@ -357,7 +365,106 @@ object Migrate {
 
                 }
 
+                if (lastVersionCode < 99) {
+                    // 多 js 文件 key 冲突导致要删除多次，这里统一处理文件名为 key
+                    val jsFolder = context.getFilePath("extension-js")
+                    val hashMap = hashMapOf<String, Triple<File, Long, String>>()
+                    val needDelete = arrayListOf<File>()
+                    val jsRuntimeProvider: JSRuntimeProvider by lazy {
+                        JSRuntimeProvider(1)
+                    }
+
+                    val folderFile = File (jsFolder)
+                    if (folderFile.exists()) {
+                        val children = folderFile.listFiles() ?: emptyArray()
+                        for (child in children) {
+                            child ?: continue
+                            val ext = if (child.name.endsWith(JsExtensionProvider.EXTENSION_SUFFIX)) {
+                                JSExtensionLoader(
+                                    child, jsRuntimeProvider
+                                ).load() as? ExtensionInfo.Installed
+
+                            } else  if (child.name.endsWith(JsExtensionProvider.EXTENSION_CRY_SUFFIX)){
+                                JSExtensionCryLoader(
+                                    child, jsRuntimeProvider
+                                ).load() as? ExtensionInfo.Installed
+                            } else {
+                                null
+                            }
+
+                            if (ext == null) {
+                                needDelete.add(child)
+                                continue
+                            }
+                            val source = ext.sources.firstOrNull()
+                            if (source == null) {
+                                needDelete.add(child)
+                                continue
+                            }
+                            val current = hashMap[source.key]
+                            if (current == null || current.second <= ext.versionCode) {
+                                if (current != null) {
+                                    needDelete.add(current.first)
+                                }
+                                hashMap[ext.key] = Triple(child, ext.versionCode, source.key)
+                            }
+                        }
+                    }
+
+                    for (mutableEntry in hashMap) {
+                        val sourceFile = mutableEntry.value.first
+                        val suffix = if (sourceFile.name.endsWith(JsExtensionProvider.EXTENSION_SUFFIX)) JsExtensionProvider.EXTENSION_SUFFIX else JsExtensionProvider.EXTENSION_CRY_SUFFIX
+                        val file = File(jsFolder, mutableEntry.key + "." + suffix)
+                        mutableEntry.value.first.renameTo(
+                            file
+                        )
+                    }
+                    for (file in needDelete) {
+                        file.delete()
+                    }
+                    jsRuntimeProvider.release()
+                }
+
+
+                if (lastVersionCode < 104) {
+                    val extensionJSPath = context.getFilePath("extension-js")
+                    val extensionJsV2Path = context.getFilePath("extension_v2")
+                    val folder = File(extensionJSPath)
+                    folder.mkdirs()
+                    File(extensionJsV2Path).mkdirs()
+
+                    val extension = arrayListOf<Pair<String, File>>()
+
+                    val list = folder.listFiles()?.filter {
+                        it.isFile && (it.name.endsWith(JsExtensionProviderV2.EXTENSION_SUFFIX) || it.name.endsWith(JsExtensionProviderV2.EXTENSION_CRY_SUFFIX))
+                    } ?: emptyList()
+                    val jsRuntimeProvider = JSRuntimeProvider(1)
+                    val loaders = ExtensionLoaderFactory.getFileJsExtensionLoaders(list, jsRuntimeProvider)
+                    val res = loaders.mapNotNull {
+                        it.load()?.let {
+                            it.key to it.sourcePath
+                        }
+                    }
+                    val indexItem = arrayListOf<JsExtensionProviderV2.IndexItem>()
+                    res.forEach {
+                        val targetFile = File(extensionJsV2Path ,"${it.first}.${if (it.second.endsWith(JsExtensionProviderV2.EXTENSION_CRY_SUFFIX)) JsExtensionProviderV2.EXTENSION_CRY_SUFFIX else JsExtensionProviderV2.EXTENSION_SUFFIX}")
+                        val realTarget = File(it.second).copyTo(targetFile, true)
+                        indexItem.add(
+                            JsExtensionProviderV2.IndexItem(
+                                key = it.first,
+                                fileName = realTarget.name,
+                            )
+                        )
+                    }
+                    val helper = Inject.get<JsonFileProvider>().extensionIndex
+                    helper.initJob.join()
+                    helper.update {
+                        indexItem
+                    }
+
+                }
                 // 在这里添加新的迁移代码
+
 
                 androidPreferenceStore.getInt("last_version_code", 0).set(curVersionCode)
                 _isMigrating.update {

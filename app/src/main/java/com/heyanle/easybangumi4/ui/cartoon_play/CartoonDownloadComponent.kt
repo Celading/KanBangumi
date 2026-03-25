@@ -157,8 +157,9 @@ fun CartoonDownloadDialog(
                         }),
                         maxLines = 1,
                         modifier = Modifier.focusRequester(focusRequester),
-                        colors = TextFieldDefaults.textFieldColors(
-                            containerColor = Color.Transparent,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
                             focusedIndicatorColor = Color.Transparent,
                         ),
@@ -329,7 +330,7 @@ fun CartoonDownloadDialog(
                                 stringRes(R.string.add_download_completely).moeSnackBar(
                                     confirmLabel = stringRes(R.string.click_to_view),
                                     onConfirm = {
-                                        nav.navigate(STORY)
+                                        nav.navigate(STORY+"?defIndex=1")
                                     }
                                 )
                             }) {

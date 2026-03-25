@@ -239,9 +239,9 @@ fun EasyMutiSelectionDialog(
     initSelection: List<CartoonTag>,
     title: @Composable () -> Unit = {},
     message: @Composable () -> Unit = {},
+    action: @Composable () -> Unit = {},
     confirmText: String = stringResource(id = com.heyanle.easy_i18n.R.string.confirm),
     onConfirm: (List<CartoonTag>) -> Unit,
-    onManage: ()->Unit,
     onDismissRequest: () -> Unit,
 ) {
     val selectList = remember {
@@ -288,20 +288,7 @@ fun EasyMutiSelectionDialog(
                 Row (
                     modifier = Modifier.fillMaxWidth()
                 ){
-                    TextButton(
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent,
-                            contentColor = MaterialTheme.colorScheme.onBackground
-                        ),
-                        onClick = {
-                            onManage()
-                            onDismissRequest()
-                        }
-                    ) {
-                        Icon(Icons.Filled.Edit, contentDescription = stringResource(id = com.heyanle.easy_i18n.R.string.edit))
-                        Spacer(modifier = Modifier.size(4.dp))
-                        Text(text = stringResource(id = com.heyanle.easy_i18n.R.string.edit))
-                    }
+                    action()
 
                     Spacer(modifier = Modifier.weight(1f))
 
@@ -418,95 +405,5 @@ fun EasyMutiSelectionDialog(
         )
     }
 
-}
-
-
-@Composable
-fun DonateDialog(
-    title: String? = null,
-    show: Boolean,
-    hasDonate: () ->Unit,
-    onDismissRequest: () -> Unit,
-){
-    val scope = rememberCoroutineScope()
-    if (show) {
-        AlertDialog(
-            title = {
-                Text(text = title?:stringResource(id = com.heyanle.easy_i18n.R.string.donate_title))
-            },
-            text = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    OkImage(
-                        modifier = Modifier.weight(1f).height(200.dp),
-                        image = Uri.parse("file:///android_asset/thanks_wx.png"),
-                        contentDescription = "" ,
-                        contentScale = ContentScale.FillHeight,
-                    )
-                    OkImage(
-                        modifier = Modifier.weight(1f).height(200.dp),
-                        image = Uri.parse("file:///android_asset/thanks_zfb.jpg"),
-                        contentDescription = "",
-                        contentScale = ContentScale.FillHeight,)
-                }
-            },
-            onDismissRequest = onDismissRequest,
-            confirmButton = {
-                Column(
-                    horizontalAlignment = Alignment.End
-                ) {
-                    TextButton(
-                        onClick = {
-                            scope.launch (Dispatchers.IO) {
-                                APP.assets?.open("thanks_wx.png")?.use {
-                                    MediaAndroidUtils.saveToDownload(
-                                        it,
-                                        "donate",
-                                        "thanks_wx.png"
-                                    )
-                                }
-
-                                APP.assets?.open("thanks_zfb.jpg")?.use {
-                                    MediaAndroidUtils.saveToDownload(
-                                        it,
-                                        "donate",
-                                        "thanks_zfb.jpg"
-                                    )
-                                }
-                                scope.launch {
-                                    "保存成功！".toast()
-                                }
-                            }
-                        }) {
-                        Text(text = "保存二维码")
-                    }
-
-                    TextButton(
-
-                        onClick = {
-                            onDismissRequest()
-                            hasDonate()
-                            "感谢支持！".toast()
-                        }) {
-                        Text(text = "我已捐赠")
-                    }
-
-                    TextButton(
-
-                        onClick = {
-                            onDismissRequest()
-                        }) {
-                        Text(text = "我拒绝")
-                    }
-                }
-
-            },
-
-        )
-    }
 }
 

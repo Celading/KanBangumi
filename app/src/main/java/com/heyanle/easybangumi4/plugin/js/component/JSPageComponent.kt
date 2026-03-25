@@ -7,6 +7,7 @@ import com.heyanle.easybangumi4.plugin.js.runtime.JSScope
 import com.heyanle.easybangumi4.plugin.js.runtime.JSScopeException
 import com.heyanle.easybangumi4.plugin.js.utils.JSFunction
 import com.heyanle.easybangumi4.plugin.js.utils.jsUnwrap
+import com.heyanle.easybangumi4.plugin.source.utils.network.web.WebProxyManager
 import com.heyanle.easybangumi4.source_api.ParserException
 import com.heyanle.easybangumi4.source_api.SourceResult
 import com.heyanle.easybangumi4.source_api.component.ComponentWrapper
@@ -60,6 +61,12 @@ class JSPageComponent(
     @Volatile
     private var mainTabList = arrayListOf<MainTab>()
 
+    private var webProxyManager: WebProxyManager? = null
+
+    override fun setWebProxyManager(webProxyManager: WebProxyManager) {
+        this.webProxyManager = webProxyManager
+    }
+
 
     override suspend fun init() {
         // 历史遗留问题导致 getPages 不是 suspend 方法，业务也没有做加载态直接同步加载
@@ -106,6 +113,7 @@ class JSPageComponent(
         }
         return mainTabList.map { mainTab2SourcePage(it) }.apply {
             this.logi("JSPageComponent")
+            webProxyManager?.close()
         }
     }
 
@@ -172,26 +180,32 @@ class JSPageComponent(
         private suspend fun load(mainTab: MainTab, subTab: SubTab?, key: Int): SourceResult<Pair<Int?, List<CartoonCover>>> {
             return withResult(Dispatchers.IO) {
                 jsScope.requestRunWithScope { context, scriptable ->
-                    val res = (getContent.call(
+                    val source = (getContent.call(
                         context,
                         scriptable,
                         scriptable,
                         arrayOf(
                             mainTab, subTab, key
                         )
-                    ).jsUnwrap() as? Pair<*, *>)
+                    ))
+                    val jsSource = source.jsUnwrap()
+                    val res = jsSource as? Pair<*, *>
                     if (res == null) {
                         throw ParserException("js parse error")
                     }
-                    val nextKey = res.first as? Int?
+                    val nextKey = res.first?.toString()?.toDoubleOrNull()?.toInt()
                     val data = res.second as? java.util.ArrayList<*> ?: throw ParserException("js parse error")
                     if (data.isNotEmpty() && data.first() !is CartoonCover) {
+                        webProxyManager?.close()
                         throw ParserException("js parse error")
                     }
-                    return@requestRunWithScope nextKey to data.filterIsInstance<CartoonCover>()
+                    webProxyManager?.close()
+                    return@requestRunWithScope nextKey to data.filterIsInstance<CartoonCover>().apply {
+                        this.forEach {
+//                            it.coverUrl.logi("JsPageComponent")
+                        }
+                    }
                 }
-            }.apply {
-                this.logi("JSPageComponent")
             }
         }
     }

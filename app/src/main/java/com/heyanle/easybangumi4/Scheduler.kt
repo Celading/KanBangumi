@@ -5,18 +5,19 @@ import android.util.Base64
 import com.heyanle.easy_crasher.CrashHandler
 import com.heyanle.easybangumi4.cartoon.CartoonModule
 import com.heyanle.easybangumi4.exo.MediaModule
-import com.heyanle.easybangumi4.plugin.extension.ExtensionController
 import com.heyanle.easybangumi4.case.CaseModule
 import com.heyanle.easybangumi4.crash.SourceCrashController
 import com.heyanle.easybangumi4.dlna.DlnaModule
 import com.heyanle.easybangumi4.plugin.extension.ExtensionModule
+import com.heyanle.easybangumi4.plugin.extension.IExtensionController
+import com.heyanle.easybangumi4.plugin.extension.remote.ExtensionRepoController
 import com.heyanle.easybangumi4.setting.SettingModule
 import com.heyanle.easybangumi4.plugin.source.SourceModule
 import com.heyanle.easybangumi4.plugin.source.utils.NativeHelperImpl
 import com.heyanle.easybangumi4.splash.SplashActivity
 import com.heyanle.easybangumi4.storage.StorageModule
 import com.heyanle.easybangumi4.ui.common.dismiss
-import com.heyanle.easybangumi4.ui.common.moeDialog
+import com.heyanle.easybangumi4.ui.common.moeDialogAlert
 import com.heyanle.easybangumi4.utils.UUIDHelper
 import com.heyanle.easybangumi4.utils.exo_ssl.CropUtil
 import com.heyanle.easybangumi4.utils.exo_ssl.TrustAllHostnameVerifier
@@ -42,8 +43,6 @@ import javax.net.ssl.HttpsURLConnection
  * https://github.com/heyanLE
  */
 object Scheduler {
-
-
 
     /**
      * application#init
@@ -102,7 +101,7 @@ object Scheduler {
      */
     fun runOnMainActivityCreate(activity: MainActivity, isFirst: Boolean) {
         Migrate.update(activity)
-        val extensionController: com.heyanle.easybangumi4.plugin.extension.ExtensionController by Inject.injectLazy()
+        val extensionController: IExtensionController by Inject.injectLazy()
         val extensionIconFactory: IconFactory by Inject.injectLazy()
         iconFactory = extensionIconFactory
         extensionController.init()
@@ -112,7 +111,7 @@ object Scheduler {
                 val firstAnnoBase = """
                ICAgICAgICAxLiDnuq=nuq/nnIvnlarmmK/kuLrkuoblrabkuaAgSml0cGFjayBjb21wb3NlIOWSjOmfs+inhumikeebuOWFs+aKgOacr+i=m+ihjOW8gOWPkeeahOS4gOS4qumhueebru+8jOWumOaWueS4jeaPkOS+m+aJk+WMheWSjOS4i+i9ve+8jOWFtua6kOS7o-eggeS7heS+m+S6pOa1geWtpuS5oOOAguWboOWFtuS7luS6uuengeiHquaJk-WMheWPkeihjOWQjumAoOaIkOeahOS4gOWIh+WQjuaenOacrOaWueamguS4jei0n+i0o+OAggogICAgICAgIDIuIOe6r+e6r+eci+eVquaJk+WMheWQjuS4jeaPkOS+m+S7u+S9leinhumikeWGheWuue+8jOmcgOimgeeUqOaIt+iHquW3seaJi+WKqOa3u+WKoOOAgueUqOaIt+iHquihjOWvvOWFpeeahOWGheWuueWSjOacrOi9r+S7tuaXoOWFs+OAggogICAgICAgIDMuIOe6r+e6r+eci+eVqua6kOeggeWujOWFqOWFjei0ue+8jOWcqCBHaXRodWIg5byA5rqQ44CC55So5oi35Y+v6Ieq6KGM5LiL6L295omT5YyF44CC5aaC5p6c5L2g5piv5pS26LS56LSt5Lmw55qE5pys6L2v5Lu277yM5YiZ5pys5pa55qaC5LiN6LSf6LSj44CC
             """.trimIndent().replace("=", "/").replace("-", "+")
-                Base64.decode(firstAnnoBase, Base64.DEFAULT).toString(Charsets.UTF_8).moeDialog(
+                Base64.decode(firstAnnoBase, Base64.DEFAULT).toString(Charsets.UTF_8).moeDialogAlert(
                     stringRes(com.heyanle.easy_i18n.R.string.first_anno),
                     dismissLabel = stringRes(com.heyanle.easy_i18n.R.string.cancel),
                     onDismiss = {
@@ -124,6 +123,9 @@ object Scheduler {
             }
 
         }
+        // 自动同步
+        Inject.get<ExtensionRepoController>().fireAutoSync()
+        UpdateController.checkUpdate()
     }
 
     fun runOnComposeLaunch(activity: MainActivity) {
@@ -133,7 +135,7 @@ object Scheduler {
                 val scope = MainScope()
                 scope.launch(Dispatchers.IO) {
                     activity.assets?.open("update_log.txt")?.bufferedReader()?.use {
-                        it.readText().moeDialog(
+                        it.readText().moeDialogAlert(
                             stringRes(com.heyanle.easy_i18n.R.string.version) + ": " + BuildConfig.VERSION_NAME,
                             dismissLabel = stringRes(com.heyanle.easy_i18n.R.string.cancel),
                             onDismiss = {
@@ -147,6 +149,7 @@ object Scheduler {
             }
         }
         first = BuildConfig.VERSION_CODE
+
     }
 
     /**

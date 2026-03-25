@@ -37,16 +37,6 @@ sealed class StoryPage constructor(
     val topAppBar: @Composable (() -> Unit),
     val content: @Composable (() -> Unit),
 ) {
-
-    data object Download :
-        StoryPage(tabLabel = { Text(text = stringResource(id = R.string.download_history)) },
-            topAppBar = {
-                DownloadTopAppBar()
-            },
-            content = {
-                Download()
-            })
-
     data object Local :
         StoryPage(tabLabel = { Text(text = stringResource(id = R.string.local_source)) },
             topAppBar = {
@@ -55,19 +45,28 @@ sealed class StoryPage constructor(
             content = {
                 Local()
             })
-
+    data object Download :
+        StoryPage(tabLabel = { Text(text = stringResource(id = R.string.download_history)) },
+            topAppBar = {
+                DownloadTopAppBar()
+            },
+            content = {
+                Download()
+            })
 }
 
 val StoryPageItems = listOf<StoryPage>(
-    StoryPage.Download,
     StoryPage.Local,
+    StoryPage.Download,
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun Story() {
+fun Story(
+    initIndex: Int = 0
+) {
     val nav = LocalNavController.current
-    val pagerState = rememberPagerState(0) { StoryPageItems.size }
+    val pagerState = rememberPagerState(initIndex) { StoryPageItems.size }
     val scope = rememberCoroutineScope()
     Surface(
         modifier = Modifier.fillMaxSize(),

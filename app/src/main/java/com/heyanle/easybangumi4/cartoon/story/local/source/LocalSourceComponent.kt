@@ -8,6 +8,8 @@ import com.heyanle.easybangumi4.plugin.source.SourceException
 import com.heyanle.easybangumi4.source_api.SourceResult
 import com.heyanle.easybangumi4.source_api.component.ComponentWrapper
 import com.heyanle.easybangumi4.source_api.component.detailed.DetailedComponent
+import com.heyanle.easybangumi4.source_api.component.page.PageComponent
+import com.heyanle.easybangumi4.source_api.component.page.SourcePage
 import com.heyanle.easybangumi4.source_api.component.play.PlayComponent
 import com.heyanle.easybangumi4.source_api.component.search.SearchComponent
 import com.heyanle.easybangumi4.source_api.entity.Cartoon
@@ -157,5 +159,6 @@ class LocalSourceComponent : ComponentWrapper(), PlayComponent, DetailedComponen
 
         }
     }
+
 
 }

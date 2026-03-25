@@ -29,6 +29,7 @@ runCatching {
 }
 
 val packageName = if (release) "com.heyanle.easybangumi4" else "com.heyanle.easybangumi4.debug"
+val labelNameRes = if (release) "@string/app_name" else "纯纯看番 Debug"
 
 android {
     namespace =  "com.heyanle.easybangumi4"
@@ -53,6 +54,7 @@ android {
         manifestPlaceholders["bugly_app_version"] = Android.versionName
         manifestPlaceholders["bugly_app_channel"] = "github"
         manifestPlaceholders["package_name"] = packageName
+        manifestPlaceholders["label_res"] = labelNameRes
         manifestPlaceholders["is_release"] = release
 
         // bugly 调试模式
@@ -87,7 +89,7 @@ android {
 
     buildTypes {
         debug {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles("proguard-rules.pro")
 
@@ -176,6 +178,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 dependencies {
 
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
     implementation(androidx.bundles.core)
     androidTestImplementation(androidx.bundles.test.core)
 
@@ -246,7 +249,7 @@ dependencies {
 
     implementation(libs.zip4j)
 
-    implementation(extension.extension.api)
+//    implementation(extension.extension.api)
 
     implementation(libs.bugly)
 

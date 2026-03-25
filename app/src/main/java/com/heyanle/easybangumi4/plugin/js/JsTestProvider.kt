@@ -8,151 +8,126 @@ class JsTestProvider {
 
     companion object {
         val testJs = """
-// @key cyc
-// @label 次元城 JS
+// @key heyanle.catwcy
+// @label 喵物次元
 // @versionName 1.0
 // @versionCode 1
 // @libVersion 11
-// @cover https://www.cycanime.com/upload/site/20240319-1/67656e504da1f0c61513066dcea769fb.png
+// @cover https://www.catwcy.com/upload/site/20241103-1/eec404ebd39ac2f18800d8c0d914457e.png
+
+// Hook PageComment  ========================================
 
 function PageComponent_getMainTabs() {
     var res = new ArrayList();
     res.add(new MainTab("首页", MainTab.MAIN_TAB_GROUP));
+    res.add(new MainTab("排期", MainTab.MAIN_TAB_GROUP));
     return res;
 }
 
 function PageComponent_getSubTabs(mainTab) {
     var res = new ArrayList();
-    res.add(new SubTab("推荐", true));
+    if (mainTab.label == "首页") {
+        res.add(new SubTab("首页", true));
+        res.add(new SubTab("TV番剧", true));
+        res.add(new SubTab("剧场电影", true));
+    } else if (mainTab.label == "排期") {
+        res.add(new SubTab("周一", true));
+        res.add(new SubTab("周二", true));
+        res.add(new SubTab("周三", true));
+        res.add(new SubTab("周四", true));
+        res.add(new SubTab("周五", true));
+        res.add(new SubTab("周六", true));
+        res.add(new SubTab("周日", true));
+    }
     return res;
 }
 
 function PageComponent_getContent(mainTab, subTab, key) {
-    var elements = getRecomElement();
+
+    if (mainTab.label == "首页") {
+        if (subTab.label == "首页") {
+            var doc = getMainHomeDocument();
+            return coverHomeMainCartoonCover(doc);
+        }
+     
+    }
+    return new Pair(null, new ArrayList());
+}
+
+// Hook DetailedComponent ========================================
+
+// function DetailedComponent_getDetailed(summary) {
+//     var cartoon = getCartoonDetailById(summary.id);
+//     var playLine = getPlayLineById(summary.id);
+//     return new Pair(cartoon, playLine);
+// }
+
+
+// utils ========================================
+var lastDoc = null;
+var lastDocTime = 0;
+function getMainHomeDocument() {
+    var now = System.currentTimeMillis();
+    // 五分钟缓存
+    if (lastDoc == null || now - lastDocTime > 1000 * 60 * 5) {
+        var ua = NetworkHelper.randomUA
+        lastDoc = Jsoup.connect("https://www.catwcy.com/").userAgent(ua).get();
+        lastDocTime = now;
+    }
+    return lastDoc;
+}
+
+function coverHomeMainCartoonCover(doc){
+    var homeCenter = doc.select("div.slide-a.slide-c.rel div.slide-time-list.mySwiper div.swiper-wrapper").first()
+    if (homeCenter == null) {
+        throw new ParserException("解析错误");
+    }
     var res = new ArrayList();
-    for (var i = 0; i < elements.size(); i++) {
-        var it = elements.get(i);
-        res.add(createCartoonCover(it));
+    var children = homeCenter.children();
+    for (var i = 0; i < children.size(); i++) {
+        var item = children.get(i);
+        if (item == null) {
+            continue;
+        }
+        var title = item.select("a div h3").text();
+        var url =  JSSourceUtils.urlParser("https://www.catwcy.com", item.select("a").attr("href"));
+        var array = url.split("/");
+        var lastIndex = array.length - 1;
+        var id = array[lastIndex];
+        if (id.endsWith(".html")) {
+            id = id.substring(0, id.length - 5);
+        }
+        var coverPattern = new Regex("(?<=url\().*(?=\))");
+        var coverStyle = item.select("a div.slide-time-img3").attr("style");
+        var cover = coverPattern.find(coverStyle, 0).groupValues[0];
+        if (cover.startsWith("'")) {
+            cover = cover.substring(1);
+        }
+        if (cover.endsWith("'")) {
+            cover = cover.substring(0, cover.length - 1);
+        }
+
+
+        var url = element.select("a").attr("href");
+        var coverUrl = element.select("img").attr("data-src");
+        var title = element.select("img").attr("alt");
+        var id = getCartoonId(url);
+        res.add(makeCartoonCover({
+            id: id,
+            url: url,
+            title: title,
+            cover: coverUrl,
+            intro: "",
+        }));
+        
     }
     return new Pair(null, res);
 
-}
 
-function DetailedComponent_getDetailed(summary) {
-    var cartoon = getCartoonDetailById(summary.id);
-    var playLine = getPlayLineById(summary.id);
-    return new Pair(cartoon, playLine);
-}
-var userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0";
 
-/**
- * 获取推荐番剧
- * @return Elements 推荐番剧
- */
-function getRecomElement() {
-    return Jsoup.connect("https://www.cycanime.com").userAgent(userAgent).get().getElementsByClass("swiper-wrapper diy-center")[0].getElementsByClass("public-list-exp");
-}
-
-function createCartoonCover(element) {
-    var id = getCartoonId(element.attr("href"));
-    var title = element.attr("title");
-    if (title.isEmpty()) {
-        title = element.getElementsByTag("img").attr("alt");
-    }
-    var url = "https://www.cycanime.com" + element.attr("href");
-    var coverUrl = element.getElementsByTag("img").attr("data-src");
-    return new CartoonCoverImpl(id, "cyc", url, title, "intro", coverUrl);
-}
-
-/**
-* 获取番剧id
-* @param source 搜索源
-* @param url 番剧url
-* @return String 番剧id
-*/
-function getCartoonId(url) {
-    var regex = new Regex("/(\\d+)");
-    return regex.find(url, 0).groupValues[1];
 }
 
 
-function getCartoonPageDocById(id) {
-    return Jsoup.connect("https://www.cycanime.com/bangumi/"+id+".html").userAgent(userAgent).get()
-}
-
- /**
- * 获取番剧播放线路
- * @param id 番剧id
- * @param source 番剧源
- * @return List<PlayLine> 番剧播放线路
- * @see PlayLine
- */
-function getPlayLineById(id) {
-    var cartoonDoc = getCartoonPageDocById(id);
-    var playLines = new ArrayList();
-    var episodes = new ArrayList();
-    var playLabel = cartoonDoc.selectXpath("/html/body/div[5]/div[2]/div[1]/div/a")
-        .text().trim();
-    var list = cartoonDoc.getElementsByClass("box border");
-    for (var i = 0; i < list.size(); i++) {
-        var episodeElement = list.get(i).getElementsByTag("a");
-        var episodeId = Regex("/watch/(\\d+)/(\\d+)/(\\d+).html").find(episodeElement.attr("href"), 0).groupValues[3];
-        var episodeOrder = i + 1;
-        var episodeLabel = episodeElement.text().trim();
-        episodes.add(
-            new Episode(
-                episodeId,
-                episodeLabel,
-                episodeOrder
-            )
-        );
-    }
-    var line = new PlayLine(
-        "1" ,
-        playLabel,
-        episodes
-    );
-    playLines.add(line);
-
-    return playLines;
-}
-
-
-/**
- * 获取番剧详情
- * @param id 番剧id
- * @param source 番剧源
- * @return CartoonImpl 番剧详情
- * @see CartoonImpl
- */
-function getCartoonDetailById(id) {
-    var videoDocument = getCartoonPageDocById(id)
-    var title = videoDocument.getElementsByClass("slide-info-title hide").text()
-    var coverUrl = videoDocument.getElementsByClass("detail-pic")[0].getElementsByTag("img").attr("data-src")
-    var intro = videoDocument.getElementsByClass("text cor3")[0].text()
-    var tagList =  videoDocument.getElementsByClass("slide-info hide").last().getElementsByTag("a")
-    var tag = "";
-    for (var i = 0; i < tagList.size(); i++) {
-        tag += tagList.get(i).text().trim();
-        if (i != tagList.size() - 1) {
-            tag += ",";
-        }
-    }
-
-    return new CartoonImpl(
-        id,
-        "cyc",
-        "https://www.cycanime.com/bangumi"+id+".html",
-        title,
-        tag,
-        coverUrl,
-        intro,
-       intro,
-       0,
-       false,
-       0
-    )
-}
         """.trim()
     }
 }

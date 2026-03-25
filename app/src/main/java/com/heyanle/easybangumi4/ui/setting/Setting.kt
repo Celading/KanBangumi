@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.PlayCircle
@@ -75,6 +76,19 @@ sealed class SettingPage(
     }, {
         ExtensionSetting(nestedScrollConnection = it)
     })
+
+    data object Developers : SettingPage("developers", {
+        Text(text = stringResource(id = R.string.developers_setting))
+    }, {
+        DevelopersSetting(nestedScrollConnection = it)
+    })
+
+    data object LocalExtension : SettingPage("local_extension", {
+        Text(text = stringResource(id = R.string.local_extension_setting))
+    }, {
+        LocalExtensionSetting(nestedScrollConnection = it)
+    })
+
 }
 
 val settingPages = mapOf(
@@ -83,6 +97,8 @@ val settingPages = mapOf(
     SettingPage.Download.router to SettingPage.Download,
     SettingPage.First.router to SettingPage.First,
     SettingPage.Extension.router to SettingPage.Extension,
+    SettingPage.Developers.router to SettingPage.Developers,
+    SettingPage.LocalExtension.router to SettingPage.LocalExtension
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,11 +113,13 @@ fun Setting(
 
     settingPages[router]?.let { settingPage ->
         Surface(
-            modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+            modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
             contentColor = MaterialTheme.colorScheme.onBackground
         ) {
-            Column {
+            Column(
+                modifier = Modifier.fillMaxSize().navigationBarsPadding()
+            ) {
                 TopAppBar(
                     title = settingPage.title,
                     navigationIcon = {
@@ -187,6 +205,19 @@ fun ColumnScope.FirstSetting(
                 Icon(
                     Icons.Filled.Extension,
                     contentDescription = stringResource(id = R.string.extension_setting)
+                )
+            }
+        )
+
+        ListItem(
+            modifier = Modifier.clickable {
+                nav.navigationSetting(SettingPage.Developers)
+            },
+            headlineContent = { Text(text = stringResource(id = R.string.developers_setting)) },
+            leadingContent = {
+                Icon(
+                    Icons.Filled.DeveloperMode,
+                    contentDescription = stringResource(id = R.string.developers_setting)
                 )
             }
         )

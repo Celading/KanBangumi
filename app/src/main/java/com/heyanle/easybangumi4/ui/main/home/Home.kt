@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.SyncAlt
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -27,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -50,11 +53,14 @@ import com.heyanle.easybangumi4.LocalNavController
 import com.heyanle.easybangumi4.navigationSearch
 import com.heyanle.easybangumi4.plugin.js.source.getIconWithAsyncOrDrawable
 import com.heyanle.easybangumi4.plugin.source.LocalSourceBundleController
+import com.heyanle.easybangumi4.ui.common.EmptyPage
 import com.heyanle.easybangumi4.ui.common.OkImage
 import com.heyanle.easybangumi4.ui.common.page.CartoonPageListTab
 import com.heyanle.easybangumi4.ui.common.page.CartoonPageUI
 import com.heyanle.easybangumi4.ui.main.MainViewModel
 import kotlinx.coroutines.launch
+import com.heyanle.easy_i18n.R
+import com.heyanle.easybangumi4.navigationSourceManager
 
 /**
  * Created by HeYanLe on 2023/3/25 15:47.
@@ -111,54 +117,85 @@ fun Home() {
             title = state.topAppBarTitle,
             onChangeClick = {
                 scope.launch {
+
                     showChangeSheet.value = true
                 }
             },
             onSearchClick = { nav.navigationSearch(state.selectionKey) }
         )
 
-        if (state.isShowLabel) {
-            CartoonPageListTab(
-                state.pages,
-                selectionIndex = state.selectionIndex,
-                onPageClick = {
-                    vm.changeSelectionPage(it)
+        if (!state.hasPageComponent) {
+            EmptyPage(
+                modifier = Modifier.fillMaxSize(),
+                emptyMsg = stringResource(R.string.no_source),
+                other = {
+                    TextButton(
+                        onClick = {
+                            nav.navigationSourceManager(1)
+                        }
+                    ) {
+                        Text(stringResource(R.string.go_to_manage_source))
+                    }
+
                 }
             )
+        } else if (state.pages.isEmpty()) {
+            EmptyPage(
+                modifier = Modifier.fillMaxSize(),
+                emptyMsg = stringResource(R.string.is_empty),
+                other = {
+//                    TextButton(
+//                        onClick = {
+//                            nav.navigationSourceManager(1)
+//                        }
+//                    ) {
+//                        Text(stringResource(R.string.go_to_manage_source))
+//                    }
 
-            HorizontalDivider()
-        }
-        
-        AnimatedContent(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .let {
-                    if (!state.isShowLabel) {
-                        it.nestedScroll(scrollBehavior.nestedScrollConnection)
-                    } else {
-                        it
+                }
+            )
+        } else {
+            if (state.isShowLabel) {
+                CartoonPageListTab(
+                    state.pages,
+                    selectionIndex = state.selectionIndex,
+                    onPageClick = {
+                        vm.changeSelectionPage(it)
                     }
-                },
-            targetState = kotlin.runCatching { state.pages[state.selectionIndex] }.getOrNull(),
-            transitionSpec = {
-                fadeIn(animationSpec = tween(300, delayMillis = 300)) togetherWith
-                        fadeOut(animationSpec = tween(300, delayMillis = 0))
-            }, label = ""
-        ) {
-            it?.let {
-                val listVmOwner = vm.getViewModelStoreOwner(it)
-                CompositionLocalProvider(
-                    LocalViewModelStoreOwner provides listVmOwner
-                ) {
-                    CartoonPageUI(cartoonPage = it)
+                )
+
+                HorizontalDivider()
+            }
+
+            AnimatedContent(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .let {
+                        if (!state.isShowLabel) {
+                            it.nestedScroll(scrollBehavior.nestedScrollConnection)
+                        } else {
+                            it
+                        }
+                    },
+                targetState = kotlin.runCatching { state.pages[state.selectionIndex] }.getOrNull(),
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(300, delayMillis = 300)) togetherWith
+                            fadeOut(animationSpec = tween(300, delayMillis = 0))
+                }, label = ""
+            ) {
+                it?.let {
+                    val listVmOwner = vm.getViewModelStoreOwner(it)
+                    CompositionLocalProvider(
+                        LocalViewModelStoreOwner provides listVmOwner
+                    ) {
+                        CartoonPageUI(cartoonPage = it)
+                    }
                 }
             }
         }
+
     }
-//    HomeBottomSheet(sheetState = sheetState, defSourceKey = state.selectionKey, onSourceClick = {
-//        vm.changeSelectionSource(it)
-//    })
 }
 
 @Composable
@@ -231,7 +268,7 @@ fun HomeTopAppBar(
         navigationIcon = {
             IconButton(onClick = { onChangeClick() }) {
                 Icon(
-                    Icons.Filled.Sync,
+                    Icons.Filled.SyncAlt,
                     stringResource(id = com.heyanle.easy_i18n.R.string.source)
                 )
             }

@@ -102,7 +102,7 @@ class CartoonRecordedModel(
     // 渲染器
     val textureView: EasyTextureView = EasyTextureView(ctx)
         .apply {
-            setScaleType(MeasureHelper.SCREEN_SCALE_FOR_HEIGHT)
+            setScaleType(MeasureHelper.SCREEN_SCALE_ADAPT)
             setExtSurfaceTextureListener(this@CartoonRecordedModel)
         }
 
@@ -322,7 +322,7 @@ class CartoonRecordedModel(
             // render 回到原点
             val ori = it.translate(-render.center)
 
-            // render 缩放到 X [-1, 1] Y [-1, 1]
+            // render 缩放到 X [-0.5, 0.5] Y [-0.5, 0.5]
             val tran = ori.copy(
                 left = ori.left * 1 / render.width,
                 right = ori.right * 1 / render.width,
@@ -330,6 +330,7 @@ class CartoonRecordedModel(
                 top = ori.top * 1 / render.height
             )
 
+            // 平移到  X [0, 1] Y [0, 1]
             val res = tran.translate(Offset(0.5f, 0.5f))
 
             res

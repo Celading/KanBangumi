@@ -33,7 +33,7 @@ import com.heyanle.easybangumi4.ui.common.page.list.SourceListPage
 import com.heyanle.easybangumi4.ui.common.page.list.SourceListViewModel
 import com.heyanle.easybangumi4.ui.common.page.list.SourceListViewModelFactory
 import com.heyanle.easybangumi4.ui.common.page.listgroup.SourceListPageGroup
-import com.heyanle.easybangumi4.ui.main.star.CoverStarViewModel
+import com.heyanle.easybangumi4.ui.common.cover_star.CoverStarViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 

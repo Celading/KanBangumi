@@ -24,7 +24,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.heyanle.easybangumi4.cartoon.entity.CartoonInfo
 import com.heyanle.easybangumi4.plugin.source.LocalSourceBundleController
 import com.heyanle.easybangumi4.source_api.entity.CartoonCover
-import com.heyanle.easybangumi4.ui.main.star.CoverStarViewModel
+import com.heyanle.easybangumi4.ui.common.cover_star.CoverStarViewModel
 import com.heyanle.easybangumi4.ui.search_migrate.search.SearchTopAppBar
 import com.heyanle.easybangumi4.ui.search_migrate.search.gather.GatherSearchViewModel
 import com.heyanle.easybangumi4.ui.search_migrate.search.gather.GatherSearchViewModelFactory
@@ -117,9 +117,11 @@ fun MigrateGather(
         ) {
             itemList.value?.let {
                 items(it) {
-                    MigrateSourceItem(sourceItem = it, starVm = starVm, supportLongTouchStart = false){
-                        onClick(it)
-                    }
+                    MigrateSourceItem(sourceItem = it, starVm = starVm, supportLongTouchStart = false
+                    , onClick = {
+                            onClick(it)
+                        },
+                        onWebCheck = null)
                 }
             }
 

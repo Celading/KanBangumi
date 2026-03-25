@@ -5,16 +5,15 @@ import com.heyanle.easy_i18n.R
 import com.heyanle.easybangumi4.APP
 import com.heyanle.easybangumi4.BuildConfig
 import com.heyanle.easybangumi4.base.hekv.HeKV
-import com.heyanle.easybangumi4.cartoon.repository.db.CartoonDatabase
+import com.heyanle.easybangumi4.base.json.JsonFileProvider
 import com.heyanle.easybangumi4.cartoon.repository.db.dao.CartoonInfoDao
-import com.heyanle.easybangumi4.plugin.extension.ExtensionController
 import com.heyanle.easybangumi4.plugin.extension.ExtensionInfo
 import com.heyanle.easybangumi4.setting.SettingMMKVPreferences
 import com.heyanle.easybangumi4.setting.SettingPreferences
 import com.heyanle.easybangumi4.source_api.Source
 import com.heyanle.easybangumi4.source_api.utils.api.PreferenceHelper
 import com.heyanle.easybangumi4.storage.entity.CartoonStorage
-import com.heyanle.easybangumi4.ui.common.moeDialog
+import com.heyanle.easybangumi4.ui.common.moeDialogAlert
 import com.heyanle.easybangumi4.utils.getCachePath
 import com.heyanle.easybangumi4.utils.stringRes
 import com.heyanle.easybangumi4.utils.toJson
@@ -28,10 +27,6 @@ import net.lingala.zip4j.ZipFile
 import net.lingala.zip4j.model.ZipParameters
 import org.json.JSONObject
 import java.io.File
-import java.text.DateFormat
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.zip.GZIPOutputStream
 
 /**
@@ -42,6 +37,7 @@ class BackupController(
     private val cartoonInfoDao: CartoonInfoDao,
     private val settingMMKVPreferences: SettingMMKVPreferences,
     private val settingPreferences: SettingPreferences,
+    private val jsonFileProvider: JsonFileProvider,
     private val globalHekv: HeKV
 ) {
 
@@ -58,6 +54,8 @@ class BackupController(
         const val ExtensionFolderName = "extension"
 
         const val SourcePrefFolderName = "source_pref"
+
+        const val ExtensionRepositoryFileName = "extension_repository.jsonl"
     }
 
     private val cacheRoot = File(APP.getCachePath(), "backup")
@@ -71,6 +69,8 @@ class BackupController(
 
         // app 设置
         val preference: Boolean = true,
+
+        val extensionRepository: Boolean = true,
 
         // 拓展
         val extensionList: Set<ExtensionInfo> = setOf(),
@@ -91,7 +91,7 @@ class BackupController(
 
             val uniFile = UniFile.fromUri(APP, uri)
             if (uniFile == null || !uniFile.canWrite()) {
-                stringRes(R.string.create_document_err).moeDialog()
+                stringRes(R.string.create_document_err).moeDialogAlert()
                 return@withContext
             }
 
@@ -103,6 +103,10 @@ class BackupController(
                     async {
                         if (param.preference)
                             backupPreference(File(cacheFolder, PreferenceFolderName))
+                    },
+                    async {
+                        if (param.extensionRepository)
+                            backupExtensionRepository(cacheFolder)
                     },
                     async {
                         if (param.extensionList.isNotEmpty())
@@ -127,10 +131,10 @@ class BackupController(
                 uniFile.openOutputStream(false).use {
                     targetZip.inputStream().copyTo(it)
                 }
-                "${stringRes(R.string.backup_completely)} ".moeDialog()
+                "${stringRes(R.string.backup_completely)} ".moeDialogAlert()
             } catch (e: Exception) {
                 e.printStackTrace()
-                "${stringRes(R.string.backup_error)} $e".moeDialog()
+                "${stringRes(R.string.backup_error)} $e".moeDialogAlert()
             }
         }
     }
@@ -214,6 +218,20 @@ class BackupController(
         spFile.writeText(spO.toString())
         hekvFile.writeText(hekvO.toString())
 
+    }
+
+    private suspend fun backupExtensionRepository(folder: File) = withContext(Dispatchers.IO) {
+        val list = jsonFileProvider.extensionRepository.getOrNull() ?: emptyList()
+        val file = File(folder, ExtensionRepositoryFileName)
+        file.delete()
+        file.createNewFile()
+        file.bufferedWriter().use { writer ->
+            list.forEach {
+                writer.write(it.toJson())
+                writer.newLine()
+            }
+            writer.flush()
+        }
     }
     private suspend fun backupExtension(folder: File, list: Set<ExtensionInfo>) = withContext(Dispatchers.IO) {
         folder.deleteRecursively()

@@ -7,11 +7,13 @@ import com.heyanle.easy_i18n.R
 import com.heyanle.easybangumi4.APP
 import com.heyanle.easybangumi4.LauncherBus
 import com.heyanle.easybangumi4.cartoon.repository.db.CartoonDatabase
+import com.heyanle.easybangumi4.case.ExtensionCase
 import com.heyanle.easybangumi4.plugin.extension.ExtensionController
 import com.heyanle.easybangumi4.plugin.extension.ExtensionInfo
+import com.heyanle.easybangumi4.plugin.extension.IExtensionController
 import com.heyanle.easybangumi4.storage.BackupController
 import com.heyanle.easybangumi4.storage.RestoreController
-import com.heyanle.easybangumi4.ui.common.moeDialog
+import com.heyanle.easybangumi4.ui.common.moeDialogAlert
 import com.heyanle.easybangumi4.utils.getCachePath
 import com.heyanle.easybangumi4.utils.stringRes
 import com.heyanle.inject.core.Inject
@@ -34,6 +36,7 @@ class StorageViewModel : ViewModel() {
         val cartoonCount: Int = -1,
         val needBackupPreferenceData: Boolean = false,
         val needBackupExtension: Boolean = false,
+        val needBackupRepository: Boolean = false,
         val needExtensionPackageInfo: Set<ExtensionInfo> = setOf(),
 
         val needBackupSourcePref: Boolean = false,
@@ -49,7 +52,7 @@ class StorageViewModel : ViewModel() {
     private val _state = MutableStateFlow(State())
     val state = _state.asStateFlow()
 
-    private val extensionController: ExtensionController by Inject.injectLazy()
+    private val extensionController: ExtensionCase by Inject.injectLazy()
 
     private val cartoonDatabase: CartoonDatabase by Inject.injectLazy()
 
@@ -60,14 +63,14 @@ class StorageViewModel : ViewModel() {
         cartoonDatabase.cartoonInfo.flowAll().map { it.size }
         viewModelScope.launch {
             combine(
-                extensionController.state,
+                extensionController.flowExtension(),
                 cartoonDatabase.cartoonInfo.flowAll().distinctUntilChanged().map { it.count { (it.starTime > 0L || it.lastHistoryTime > 0L) && !it.isLocal } }
             ) { extension, count ->
                 extension to count
             }.collectLatest { pair ->
                 _state.update {
                     it.copy(
-                        extensionInfoList = pair.first.extensionInfoMap.values.toList(),
+                        extensionInfoList = pair.first.toList(),
                         cartoonCount = pair.second
                     )
                 }
@@ -92,6 +95,12 @@ class StorageViewModel : ViewModel() {
     fun setNeedBackupExtension(need: Boolean) {
         _state.update {
             it.copy(needBackupExtension = need)
+        }
+    }
+
+    fun setNeedBackupExtensionRepository(need: Boolean) {
+        _state.update {
+            it.copy(needBackupRepository = need)
         }
     }
 
@@ -140,7 +149,7 @@ class StorageViewModel : ViewModel() {
 
     fun onBackup(uri: Uri?) {
         if (uri == null) {
-            stringRes(com.heyanle.easy_i18n.R.string.no_document).moeDialog()
+            stringRes(com.heyanle.easy_i18n.R.string.no_document).moeDialogAlert()
             return
         }
         _state.update {
@@ -157,6 +166,7 @@ class StorageViewModel : ViewModel() {
                         starCartoon = cur.needBackupCartoonData,
                         historyCartoon = cur.needBackupCartoonData,
                         preference = cur.needBackupPreferenceData,
+                        extensionRepository = cur.needBackupRepository,
                         sourcePreferencesSource = emptySet(),
                         extensionList = if (cur.needBackupExtension) cur.needExtensionPackageInfo else emptySet(),
                     ),
@@ -164,7 +174,7 @@ class StorageViewModel : ViewModel() {
                 )
             } catch (e: Exception) {
                 e.printStackTrace()
-                "${stringRes(R.string.backup_error)} $e".moeDialog()
+                "${stringRes(R.string.backup_error)} $e".moeDialogAlert()
             }
 
             _state.update {
@@ -179,7 +189,7 @@ class StorageViewModel : ViewModel() {
     fun onRestoreClick() {
         LauncherBus.current?.getBackupZip { uri ->
             if (uri == null) {
-                stringRes(com.heyanle.easy_i18n.R.string.no_document).moeDialog()
+                stringRes(com.heyanle.easy_i18n.R.string.no_document).moeDialogAlert()
                 return@getBackupZip
             }
             showRestoreDialog(uri)
@@ -198,7 +208,7 @@ class StorageViewModel : ViewModel() {
                 restoreController.restore(uri)
             } catch (e: Exception) {
                 e.printStackTrace()
-                "${stringRes(R.string.restore_error)} $e".moeDialog()
+                "${stringRes(R.string.restore_error)} $e".moeDialogAlert()
             }
 
             _state.update {

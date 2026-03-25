@@ -6,7 +6,7 @@ import com.heyanle.easybangumi4.crash.SourceCrashController
 import com.heyanle.easybangumi4.plugin.extension.ExtensionInfo
 import com.heyanle.easybangumi4.plugin.extension.loader.AbsExtensionLoader
 import com.heyanle.easybangumi4.plugin.extension.loader.ExtensionLoader
-import com.heyanle.easybangumi4.plugin.js.runtime.JSRuntime
+import com.heyanle.easybangumi4.plugin.extension.provider.JsExtensionProvider
 import com.heyanle.easybangumi4.plugin.js.runtime.JSRuntimeProvider
 import com.heyanle.easybangumi4.plugin.js.runtime.JSScope
 import com.heyanle.easybangumi4.plugin.js.source.JsSource
@@ -37,7 +37,7 @@ class JSExtensionLoader(
         get() = "js:${file.path}"
 
     override fun canLoad(): Boolean {
-        return file.isFile && file.exists() && file.canRead()
+        return file.isFile && file.exists() && file.canRead() && file.name.endsWith(JsExtensionProvider.EXTENSION_SUFFIX)
     }
 
     override fun load(): ExtensionInfo? {
@@ -59,7 +59,7 @@ class JSExtensionLoader(
                 var spacerAfterAtIndex = -1
 
                 line.forEachIndexed { index, c ->
-                    if (firstAtIndex == -1 && c != '@'){
+                    if (firstAtIndex == -1 && c == '@'){
                         firstAtIndex = index
                     }
                     if (firstAtIndex != -1 && spacerAfterAtIndex == -1 && c == ' '){
